@@ -49,6 +49,8 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -59,8 +61,24 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOA
+#define Servo1_Pin GPIO_PIN_1
+#define Servo1_GPIO_Port GPIOA
 #define VCP_TX_Pin GPIO_PIN_2
 #define VCP_TX_GPIO_Port GPIOA
+#define Servo2_Pin GPIO_PIN_5
+#define Servo2_GPIO_Port GPIOA
+#define R4_Pin GPIO_PIN_7
+#define R4_GPIO_Port GPIOA
+#define R3_Pin GPIO_PIN_1
+#define R3_GPIO_Port GPIOB
+#define C1_Pin GPIO_PIN_8
+#define C1_GPIO_Port GPIOA
+#define R1_Pin GPIO_PIN_9
+#define R1_GPIO_Port GPIOA
+#define R2_Pin GPIO_PIN_10
+#define R2_GPIO_Port GPIOA
+#define C2_Pin GPIO_PIN_11
+#define C2_GPIO_Port GPIOA
 #define SWDIO_Pin GPIO_PIN_13
 #define SWDIO_GPIO_Port GPIOA
 #define SWCLK_Pin GPIO_PIN_14
@@ -69,6 +87,10 @@ void Error_Handler(void);
 #define VCP_RX_GPIO_Port GPIOA
 #define LD3_Pin GPIO_PIN_3
 #define LD3_GPIO_Port GPIOB
+#define C4_Pin GPIO_PIN_4
+#define C4_GPIO_Port GPIOB
+#define C3_Pin GPIO_PIN_5
+#define C3_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
@@ -79,5 +101,4 @@ void Error_Handler(void);
 #endif
 
 #endif /* __MAIN_H */
-
 extern volatile int esp32_data_ready;
