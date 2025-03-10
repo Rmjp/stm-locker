@@ -180,19 +180,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  while (1)
-  {
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-    if (esp32_data_ready)
-	      {
-	          esp32_data_ready = 0;
-	          // do the read
-	          SlaveDataReady_Callback();
-	      }
-  }
-  /* USER CODE END 3 */
 }
 
 /**
@@ -680,7 +668,7 @@ void keypadTask(void const * argument)
 	      // Print an asterisk for each digit entered.
 	      for(uint8_t i = 0; i < pin_index; i++)
 	      {
-	        SSD1306_Puts("*", &Font_11x18, 1);
+	        SSD1306_Puts("x", &Font_11x18, 1);
 	      }
 	      SSD1306_UpdateScreen();
 
@@ -705,6 +693,16 @@ void i2cTask03(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+	      /* USER CODE END WHILE */
+
+	      /* USER CODE BEGIN 3 */
+	      if (esp32_data_ready)
+	  	      {
+	  	          esp32_data_ready = 0;
+	  	          // do the read
+	  	          SlaveDataReady_Callback();
+	  	      }
+	    /* USER CODE END 3 */
     osDelay(1);
   }
   /* USER CODE END i2cTask03 */
