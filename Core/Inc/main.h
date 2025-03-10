@@ -93,7 +93,7 @@ void Error_Handler(void);
 #define C3_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+extern volatile int esp32_data_ready;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
@@ -101,4 +101,3 @@ void Error_Handler(void);
 #endif
 
 #endif /* __MAIN_H */
-extern volatile int esp32_data_ready;

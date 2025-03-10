@@ -18,10 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "fonts.h"
+#include "ssd1306.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +50,10 @@ TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 
+osThreadId defaultTaskHandle;
+osThreadId keypadHandle;
+osThreadId i2cHandle;
+osMessageQId i2cQHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -58,6 +65,10 @@ static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
+void StartDefaultTask(void const * argument);
+void keypadTask(void const * argument);
+void i2cTask03(void const * argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -73,13 +84,15 @@ PUTCHAR_PROTOTYPE
 
   return ch;
 }
+volatile int esp32_data_ready = 0;
+
+
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
-volatile int esp32_data_ready = 0;
 int main(void)
 {
 
@@ -93,7 +106,6 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -111,23 +123,73 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+  printf("Hello \n");
+
+  SSD1306_Init (); // initialise the display
+  SSD1306_GotoXY (10,10); // goto 10, 10
+  SSD1306_Puts ("HELLO", &Font_11x18, 1); // print Hello
+  SSD1306_GotoXY (10, 30);
+  SSD1306_Puts ("WORLD !!", &Font_11x18, 1);
+  SSD1306_UpdateScreen(); // update screen
+
   /* USER CODE END 2 */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* definition and creation of i2cQ */
+  osMessageQDef(i2cQ, 16, uint16_t);
+  i2cQHandle = osMessageCreate(osMessageQ(i2cQ), NULL);
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of defaultTask */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* definition and creation of keypad */
+  osThreadDef(keypad, keypadTask, osPriorityIdle, 0, 128);
+  keypadHandle = osThreadCreate(osThread(keypad), NULL);
+
+  /* definition and creation of i2c */
+  osThreadDef(i2c, i2cTask03, osPriorityIdle, 0, 128);
+  i2cHandle = osThreadCreate(osThread(i2c), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  printf("Hello \n");
 
   while (1)
   {
     /* USER CODE END WHILE */
-    
+    /* USER CODE BEGIN 3 */
     if (esp32_data_ready)
 	      {
 	          esp32_data_ready = 0;
 	          // do the read
 	          SlaveDataReady_Callback();
 	      }
-    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -349,7 +411,7 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Channel7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
 
 }
@@ -419,6 +481,205 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void const * argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_keypadTask */
+/**
+* @brief Function implementing the keypad thread.
+* @param argument: Not used
+* @retval None
+*/
+char read_keypad(void)
+{
+    // --- Scan Row 1 ---
+    HAL_GPIO_WritePin(R1_GPIO_Port, R1_Pin, GPIO_PIN_RESET);  // Set Row 1 low
+    HAL_GPIO_WritePin(R2_GPIO_Port, R2_Pin, GPIO_PIN_SET);      // Set Row 2 high
+    HAL_GPIO_WritePin(R3_GPIO_Port, R3_Pin, GPIO_PIN_SET);      // Set Row 3 high
+    HAL_GPIO_WritePin(R4_GPIO_Port, R4_Pin, GPIO_PIN_SET);      // Set Row 4 high
+
+    if(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET);
+        return '1';
+    }
+    if(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET);
+        return '2';
+    }
+    if(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET);
+        return '3';
+    }
+    if(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET);
+        return 'A';
+    }
+
+    // --- Scan Row 2 ---
+    HAL_GPIO_WritePin(R1_GPIO_Port, R1_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R2_GPIO_Port, R2_Pin, GPIO_PIN_RESET);  // Set Row 2 low
+    HAL_GPIO_WritePin(R3_GPIO_Port, R3_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R4_GPIO_Port, R4_Pin, GPIO_PIN_SET);
+
+    if(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET);
+        return '4';
+    }
+    if(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET);
+        return '5';
+    }
+    if(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET);
+        return '6';
+    }
+    if(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET);
+        return 'B';
+    }
+
+    // --- Scan Row 3 ---
+    HAL_GPIO_WritePin(R1_GPIO_Port, R1_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R2_GPIO_Port, R2_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R3_GPIO_Port, R3_Pin, GPIO_PIN_RESET);  // Set Row 3 low
+    HAL_GPIO_WritePin(R4_GPIO_Port, R4_Pin, GPIO_PIN_SET);
+
+    if(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET);
+        return '7';
+    }
+    if(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET);
+        return '8';
+    }
+    if(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET);
+        return '9';
+    }
+    if(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET);
+        return 'C';
+    }
+
+    // --- Scan Row 4 ---
+    HAL_GPIO_WritePin(R1_GPIO_Port, R1_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R2_GPIO_Port, R2_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R3_GPIO_Port, R3_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(R4_GPIO_Port, R4_Pin, GPIO_PIN_RESET);  // Set Row 4 low
+
+    if(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C1_GPIO_Port, C1_Pin) == GPIO_PIN_RESET);
+        return '*';
+    }
+    if(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C2_GPIO_Port, C2_Pin) == GPIO_PIN_RESET);
+        return '0';
+    }
+    if(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C3_GPIO_Port, C3_Pin) == GPIO_PIN_RESET);
+        return '#';
+    }
+    if(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET)
+    {
+        while(HAL_GPIO_ReadPin(C4_GPIO_Port, C4_Pin) == GPIO_PIN_RESET);
+        return 'D';
+    }
+
+    // If no key is pressed, return null character.
+    return '\0';
+}
+
+/* USER CODE END Header_keypadTask */
+void keypadTask(void const * argument)
+{
+    char key;
+    /* USER CODE BEGIN keypadTask */
+    // (Optional) Clear the LCD and set initial cursor position
+
+    /* Infinite loop */
+    for(;;)
+    {
+        key = read_keypad();  // Scan the keypad
+        if(key != '\0')
+        {
+            // Debug print to UART
+            printf("Key pressed: %c\r\n", key);
+        }
+        osDelay(50); // Delay to help with debouncing and CPU load
+    }
+    /* USER CODE END keypadTask */
+}
+
+/* USER CODE BEGIN Header_i2cTask03 */
+/**
+* @brief Function implementing the i2c thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_i2cTask03 */
+void i2cTask03(void const * argument)
+{
+  /* USER CODE BEGIN i2cTask03 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END i2cTask03 */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
@@ -457,7 +718,6 @@ void SlaveDataReady_Callback(void)
         printf("I2C read error ESP 1\n");
     }
 }
-
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
