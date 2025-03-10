@@ -71,6 +71,18 @@ void i2cTask03(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
+void servo1(int d){
+	htim2.Instance->CCR2 = d;
+}
+
+void open(){
+	servo1(25);
+}
+
+void close(){
+	servo1(125);
+}
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -85,6 +97,9 @@ PUTCHAR_PROTOTYPE
   return ch;
 }
 volatile int esp32_data_ready = 0;
+osMutexId i2cMutexHandle;
+char password[4] = "1234";
+
 
 
 /* USER CODE END 0 */
@@ -132,10 +147,14 @@ int main(void)
   SSD1306_Puts ("WORLD !!", &Font_11x18, 1);
   SSD1306_UpdateScreen(); // update screen
 
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  osMutexDef(i2cMutex);
+  i2cMutexHandle = osMutexCreate(osMutex(i2cMutex));
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -643,34 +662,48 @@ void keypadTask(void const * argument)
 	      else if(key == '#')
 	      {
 	        // Example PIN check (replace "1234" with your desired PIN)
-	        SSD1306_Clear();
-	        SSD1306_GotoXY(0, 0);
-	        if(strcmp(pin, "1234") == 0)
-	        {
-	          SSD1306_Puts("PIN OK", &Font_11x18, 1);
-	        }
-	        else
-	        {
-	          SSD1306_Puts("PIN ERR", &Font_11x18, 1);
-	        }
-	        SSD1306_UpdateScreen();
+          if (osMutexWait(i2cMutexHandle, osWaitForever) == osOK)
+          {
+            SSD1306_Clear();
+            SSD1306_GotoXY(0, 0);
+            if(strcmp(pin, password) == 0)
+            {
+              SSD1306_Puts("PIN OK", &Font_11x18, 1);
+            }
+            else
+            {
+              SSD1306_Puts("PIN ERR", &Font_11x18, 1);
+            }
+            SSD1306_UpdateScreen();
+            osMutexRelease(i2cMutexHandle);
+          }
 	        osDelay(1000);  // Show the result for a second
 
 	        // Clear the PIN buffer after submission.
 	        pin_index = 0;
 	        pin[0] = '\0';
 	      }
+	      else if(key == 'A'){
+	    	  open();
+	      }
+	      else if(key == 'B'){
+	      	  close();
+	      }
 
 	      // After any key action update the display with the masked PIN.
-	      SSD1306_Clear();
-	      SSD1306_GotoXY(0, 0);
-	      SSD1306_Puts("PIN: ", &Font_11x18, 1);
-	      // Print an asterisk for each digit entered.
-	      for(uint8_t i = 0; i < pin_index; i++)
-	      {
-	        SSD1306_Puts("x", &Font_11x18, 1);
-	      }
-	      SSD1306_UpdateScreen();
+        if (osMutexWait(i2cMutexHandle, osWaitForever) == osOK)
+        {
+          SSD1306_Clear();
+          SSD1306_GotoXY(0, 0);
+          SSD1306_Puts("PIN: ", &Font_11x18, 1);
+          // Print an asterisk for each digit entered.
+          for(uint8_t i = 0; i < pin_index; i++)
+          {
+            SSD1306_Puts("x", &Font_11x18, 1);
+          }
+          SSD1306_UpdateScreen();
+          osMutexRelease(i2cMutexHandle);
+        }
 
 	      // (Optional) Debug print to UART.
 	      printf("Key pressed: %c, current PIN: %s\r\n", key, pin);
@@ -703,7 +736,7 @@ void i2cTask03(void const * argument)
 	  	          SlaveDataReady_Callback();
 	  	      }
 	    /* USER CODE END 3 */
-    osDelay(1);
+    osDelay(50);
   }
   /* USER CODE END i2cTask03 */
 }
@@ -755,17 +788,40 @@ void SlaveDataReady_Callback(void)
 {
     // Master reads 2 bytes from the slave, for example
     uint8_t rxBuffer[8] = {0};
-    if (HAL_I2C_Master_Receive(&hi2c1, SLAVE1_ADDR_8BIT, rxBuffer, 4, 100) == HAL_OK)
+    if (osMutexWait(i2cMutexHandle, osWaitForever) == osOK)
     {
-        printf("Received from ESP32 1:");
-        for(int i=0; i<8; i++){
-        	printf("0x%02X ", rxBuffer[i]);
-        }
-        printf("\n");
-    }
-    else
-    {
-        printf("I2C read error ESP 1\n");
+      if (HAL_I2C_Master_Receive(&hi2c1, SLAVE1_ADDR_8BIT, rxBuffer, 8, 100) == HAL_OK)
+      {
+          printf("Received from ESP32 1:");
+          for(int i=0; i<8; i++){
+            printf("0x%02X ", rxBuffer[i]);
+          }
+          printf("\n");
+
+          char topic = rxBuffer[0];
+          uint32_t value = ((uint32_t)rxBuffer[4] << 24) |
+                           ((uint32_t)rxBuffer[3] << 16) |
+                           ((uint32_t)rxBuffer[2] <<  8) |
+                           ((uint32_t)rxBuffer[1]      );
+          if(topic == 'o'){
+        	  open();
+          }
+          if(topic == 'c'){
+        	  close();
+          }
+          if(topic == 'p'){
+        	  char snum[4];
+        	  itoa(value, snum, 10);
+        	  for(int i=0; i<4; i++){
+        		  password[i] = snum[i];
+        	  }
+          }
+      }
+      else
+      {
+          printf("I2C read error ESP 1\n");
+      }
+      osMutexRelease(i2cMutexHandle);
     }
 }
 #ifdef  USE_FULL_ASSERT
