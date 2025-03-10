@@ -18,4 +18,4 @@
 ../Core/Src/main.c:749:6:i2cTask03	2
 ../Core/Src/main.c:778:6:HAL_TIM_PeriodElapsedCallback	2
 ../Core/Src/main.c:796:6:Error_Handler	1
-../Core/Src/main.c:813:6:SlaveDataReady_Callback	4
+../Core/Src/main.c:813:6:SlaveDataReady_Callback	14

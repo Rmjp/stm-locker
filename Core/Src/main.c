@@ -76,7 +76,7 @@ void servo1(int d){
 }
 
 void servo2(int d){
-	htim2.Instance->CCR1 = d;
+	htim2.Instance->CCR4 = d;
 }
 
 int lock_d = 25;
@@ -173,6 +173,7 @@ int main(void)
   SSD1306_UpdateScreen(); // update screen
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
 
   /* USER CODE END 2 */
 
@@ -383,7 +384,7 @@ static void MX_TIM2_Init(void)
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
   {
     Error_Handler();
   }
