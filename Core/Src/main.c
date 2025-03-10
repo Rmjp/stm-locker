@@ -183,6 +183,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
     if (esp32_data_ready)
 	      {
@@ -270,7 +271,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x10805D88;
+  hi2c1.Init.Timing = 0x0090194B;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -622,22 +623,73 @@ char read_keypad(void)
 /* USER CODE END Header_keypadTask */
 void keypadTask(void const * argument)
 {
-    char key;
-    /* USER CODE BEGIN keypadTask */
-    // (Optional) Clear the LCD and set initial cursor position
+  /* USER CODE BEGIN keypadTask */
+	char key;
+	  // Buffer to hold up to 4-digit PIN plus null terminator.
+	  static char pin[5] = "";
+	  // Index for current position in the PIN buffer.
+	  static uint8_t pin_index = 0;
 
-    /* Infinite loop */
-    for(;;)
-    {
-        key = read_keypad();  // Scan the keypad
-        if(key != '\0')
-        {
-            // Debug print to UART
-            printf("Key pressed: %c\r\n", key);
-        }
-        osDelay(50); // Delay to help with debouncing and CPU load
-    }
-    /* USER CODE END keypadTask */
+	  for(;;)
+	  {
+	    key = read_keypad();  // Scan the keypad
+	    if(key != '\0')
+	    {
+	      // If a numeric key (0-9) is pressed, append it if there is space.
+	      if(key >= '0' && key <= '9')
+	      {
+	        if(pin_index < 4)
+	        {
+	          pin[pin_index++] = key;
+	          pin[pin_index] = '\0';
+	        }
+	      }
+	      // If '*' is pressed, clear the current PIN entry.
+	      else if(key == '*')
+	      {
+	        pin_index = 0;
+	        pin[0] = '\0';
+	      }
+	      // If '#' is pressed, assume it's a submit.
+	      // (For example, check if the PIN is correct, then clear the buffer.)
+	      else if(key == '#')
+	      {
+	        // Example PIN check (replace "1234" with your desired PIN)
+	        SSD1306_Clear();
+	        SSD1306_GotoXY(0, 0);
+	        if(strcmp(pin, "1234") == 0)
+	        {
+	          SSD1306_Puts("PIN OK", &Font_11x18, 1);
+	        }
+	        else
+	        {
+	          SSD1306_Puts("PIN ERR", &Font_11x18, 1);
+	        }
+	        SSD1306_UpdateScreen();
+	        osDelay(1000);  // Show the result for a second
+
+	        // Clear the PIN buffer after submission.
+	        pin_index = 0;
+	        pin[0] = '\0';
+	      }
+
+	      // After any key action update the display with the masked PIN.
+	      SSD1306_Clear();
+	      SSD1306_GotoXY(0, 0);
+	      SSD1306_Puts("PIN: ", &Font_11x18, 1);
+	      // Print an asterisk for each digit entered.
+	      for(uint8_t i = 0; i < pin_index; i++)
+	      {
+	        SSD1306_Puts("*", &Font_11x18, 1);
+	      }
+	      SSD1306_UpdateScreen();
+
+	      // (Optional) Debug print to UART.
+	      printf("Key pressed: %c, current PIN: %s\r\n", key, pin);
+	    }
+	    osDelay(50); // Delay to help with debouncing and reduce CPU load.
+	  }
+  /* USER CODE END keypadTask */
 }
 
 /* USER CODE BEGIN Header_i2cTask03 */
