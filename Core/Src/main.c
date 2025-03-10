@@ -75,12 +75,37 @@ void servo1(int d){
 	htim2.Instance->CCR2 = d;
 }
 
+void servo2(int d){
+	htim2.Instance->CCR1 = d;
+}
+
+int lock_d = 25;
+int unlock_d = 125;
+
+int open_d = 25;
+int close_d = 125;
+
+int delay_open = 1000;
+int delay_close = 1000;
+
+void lock(){
+	servo2(lock_d);
+}
+
+void unlock(){
+	servo2(unlock_d);
+}
+
 void open(){
-	servo1(25);
+	unlock();
+	osDelay(delay_open);
+	servo1(open_d);
 }
 
 void close(){
-	servo1(125);
+	servo1(close_d);
+	osDelay(delay_close);
+	lock();
 }
 
 /* USER CODE END PFP */
@@ -816,6 +841,34 @@ void SlaveDataReady_Callback(void)
         		  password[i] = snum[i];
         	  }
           }
+          if(topic == '1'){
+            lock_d = value;
+          }
+          if(topic == '2'){
+        	unlock_d = value;
+          }
+          if(topic == '3'){
+        	  open_d = value;
+          }
+          if(topic == '4'){
+        	  close_d = value;
+          }
+          if(topic == '5'){
+        	  delay_open = value;
+          }
+          if(topic == '6'){
+        	  delay_close = value;
+          }
+
+//          int lock_d = 25;
+//          int unlock_d = 125;
+//
+//          int open_d = 25;
+//          int close_d = 125;
+//
+//          int delay_open = 1000;
+//          int delay_close = 1000;
+
       }
       else
       {
